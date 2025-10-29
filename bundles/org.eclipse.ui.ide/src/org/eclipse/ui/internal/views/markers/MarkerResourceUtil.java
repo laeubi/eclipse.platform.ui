@@ -31,6 +31,7 @@ import org.eclipse.core.resources.mapping.ResourceTraversal;
 import org.eclipse.core.runtime.Adapters;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.ui.internal.ide.Policy;
 import org.eclipse.ui.internal.util.Util;
@@ -283,7 +284,50 @@ class MarkerResourceUtil {
 				java.util.Collections.addAll(projects, ((ResourceMapping) element).getProjects());
 			}
 		}
+		// Include nested child projects for hierarchical project support
+		projects.addAll(getNestedChildProjects(projects));
 		return projects;
+	}
+
+	/**
+	 * Returns all nested child projects of the given projects. A project is
+	 * considered a nested child if its location is a descendant of the parent
+	 * project's location. This supports the hierarchical project display feature.
+	 *
+	 * @param parentProjects
+	 *            the projects to find nested children for
+	 * @return collection of all nested child projects (does not include the parent
+	 *         projects themselves)
+	 */
+	static Collection<IProject> getNestedChildProjects(Collection<IProject> parentProjects) {
+		HashSet<IProject> nestedChildren = new HashSet<>();
+		if (parentProjects == null || parentProjects.isEmpty()) {
+			return nestedChildren;
+		}
+
+		IProject[] allProjects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
+		for (IProject project : allProjects) {
+			if (!project.exists() || !project.isAccessible()) {
+				continue;
+			}
+			IPath projectLocation = project.getLocation();
+			if (projectLocation == null) {
+				continue;
+			}
+
+			// Check if this project is nested under any of the parent projects
+			for (IProject parentProject : parentProjects) {
+				if (parentProject.equals(project)) {
+					continue; // Skip the project itself
+				}
+				IPath parentLocation = parentProject.getLocation();
+				if (parentLocation != null && parentLocation.isPrefixOf(projectLocation)) {
+					nestedChildren.add(project);
+					break;
+				}
+			}
+		}
+		return nestedChildren;
 	}
 
 	/**

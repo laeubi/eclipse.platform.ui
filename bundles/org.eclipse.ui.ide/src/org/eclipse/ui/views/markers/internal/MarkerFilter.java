@@ -30,6 +30,7 @@ import org.eclipse.core.resources.mapping.ResourceMapping;
 import org.eclipse.core.runtime.Adapters;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.jface.dialogs.IDialogSettings;
 import org.eclipse.ui.IMemento;
 import org.eclipse.ui.IWorkingSet;
@@ -324,6 +325,12 @@ public class MarkerFilter implements Cloneable {
 				if (project.equals(selectedProject)) {
 					return true;
 				}
+
+				// Check if marker's project is a nested child of the selected project
+				// to support hierarchical project display
+				if (isNestedChild(project, selectedProject)) {
+					return true;
+				}
 			}
 			break;
 		case ON_SELECTED_ONLY:
@@ -348,6 +355,27 @@ public class MarkerFilter implements Cloneable {
 			break;
 		}
 		return false;
+	}
+
+	/**
+	 * Returns whether the child project is nested under the parent project.
+	 * A project is considered nested if its location is a descendant of the
+	 * parent project's location.
+	 *
+	 * @param child the potential nested child project
+	 * @param parent the potential parent project
+	 * @return true if child is nested under parent, false otherwise
+	 */
+	private boolean isNestedChild(IProject child, IProject parent) {
+		if (child == null || parent == null || child.equals(parent)) {
+			return false;
+		}
+		IPath childLocation = child.getLocation();
+		IPath parentLocation = parent.getLocation();
+		if (childLocation == null || parentLocation == null) {
+			return false;
+		}
+		return parentLocation.isPrefixOf(childLocation);
 	}
 
 	/**
