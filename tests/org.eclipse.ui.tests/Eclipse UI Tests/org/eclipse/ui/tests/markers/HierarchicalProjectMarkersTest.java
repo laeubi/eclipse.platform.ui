@@ -14,6 +14,7 @@
 package org.eclipse.ui.tests.markers;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -25,7 +26,6 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.ui.internal.views.markers.MarkerResourceUtil;
 import org.eclipse.ui.views.markers.internal.MarkerFilter;
 import org.eclipse.ui.views.markers.internal.ProblemFilter;
@@ -151,8 +151,8 @@ public class HierarchicalProjectMarkersTest {
 				new org.eclipse.ui.views.markers.internal.ProblemMarker(unrelatedMarker);
 
 			// The filter should NOT select the marker from the unrelated project
-			assertTrue("Filter should not select marker from unrelated project",
-					!filter.select(problemMarker));
+			assertFalse("Filter should not select marker from unrelated project",
+					filter.select(problemMarker));
 		} finally {
 			if (unrelatedProject.exists()) {
 				unrelatedProject.delete(true, true, null);
