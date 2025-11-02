@@ -28,6 +28,7 @@ import org.eclipse.core.runtime.ILogListener;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.e4.core.services.events.IEventBroker;
 import org.eclipse.e4.ui.model.application.MApplication;
+import org.eclipse.e4.ui.model.application.ui.MImperativeExpression;
 import org.eclipse.e4.ui.model.application.ui.basic.MTrimBar;
 import org.eclipse.e4.ui.model.application.ui.basic.MTrimmedWindow;
 import org.eclipse.e4.ui.model.application.ui.menu.MDirectToolItem;
@@ -494,8 +495,7 @@ public class ToolBarManagerRendererTest {
 		toolItem.setLabel("Test Tool Item");
 		
 		// Create an imperative expression
-		org.eclipse.e4.ui.model.application.ui.MImperativeExpression exp = 
-				ems.createModelElement(org.eclipse.e4.ui.model.application.ui.MImperativeExpression.class);
+		MImperativeExpression exp = ems.createModelElement(MImperativeExpression.class);
 		exp.setTracking(true);
 		exp.setContributionURI(
 				"bundleclass://org.eclipse.e4.ui.tests/org.eclipse.e4.ui.tests.workbench.ImperativeExpressionTestEvaluation");

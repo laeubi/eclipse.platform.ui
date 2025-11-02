@@ -1006,6 +1006,11 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		updateVariables.addAll(Arrays.asList(info.getAccessedVariableNames()));
 		
 		final IEclipseContext parentContext = getContext(toolbarModel);
+		if (parentContext == null) {
+			// Cannot set up tracking without a context
+			return;
+		}
+		
 		parentContext.runAndTrack(new RunAndTrack() {
 			@Override
 			public boolean changed(IEclipseContext context) {
