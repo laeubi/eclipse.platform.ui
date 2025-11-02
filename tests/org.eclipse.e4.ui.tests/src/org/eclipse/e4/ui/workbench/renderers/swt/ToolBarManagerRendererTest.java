@@ -486,6 +486,58 @@ public class ToolBarManagerRendererTest {
 		assertEquals(2, toolBar.getChildren().size());
 	}
 
+	@Test
+	public void testVisibilityOfToolBarItemChangesBasedOnImperativeExpression() {
+		// Create a direct tool item with imperative expression
+		MDirectToolItem toolItem = ems.createModelElement(MDirectToolItem.class);
+		toolItem.setElementId("testToolItem");
+		toolItem.setLabel("Test Tool Item");
+		
+		// Create an imperative expression
+		org.eclipse.e4.ui.model.application.ui.MImperativeExpression exp = 
+				ems.createModelElement(org.eclipse.e4.ui.model.application.ui.MImperativeExpression.class);
+		exp.setTracking(true);
+		exp.setContributionURI(
+				"bundleclass://org.eclipse.e4.ui.tests/org.eclipse.e4.ui.tests.workbench.ImperativeExpressionTestEvaluation");
+		toolItem.setVisibleWhen(exp);
+		
+		toolBar.getChildren().add(toolItem);
+		
+		contextRule.createAndRunWorkbench(window);
+		ToolBarManager tbm = getToolBarManager();
+		
+		assertEquals(1, tbm.getSize());
+		
+		// Initially the expression should evaluate to false (mmc1 is not set)
+		// The item should not be visible
+		assertFalse("Tool item should not be visible initially", tbm.getItems()[0].isVisible());
+		assertFalse("Model item should not be visible initially", toolItem.isVisible());
+		
+		// Set mmc1 to true - this should trigger the imperative expression to evaluate to true
+		contextRule.getContext().set("mmc1", Boolean.TRUE);
+		
+		// Process pending UI events to allow the RunAndTrack to execute
+		while (contextRule.getContext().get(org.eclipse.swt.widgets.Display.class).readAndDispatch()) {
+			// Process events
+		}
+		
+		// Tool item should now be visible
+		assertTrue("Tool item should be visible after context change", tbm.getItems()[0].isVisible());
+		assertTrue("Model item should be visible after context change", toolItem.isVisible());
+		
+		// Set mmc1 to false - this should trigger the imperative expression to evaluate to false
+		contextRule.getContext().set("mmc1", Boolean.FALSE);
+		
+		// Process pending UI events
+		while (contextRule.getContext().get(org.eclipse.swt.widgets.Display.class).readAndDispatch()) {
+			// Process events
+		}
+		
+		// Tool item should not be visible again
+		assertFalse("Tool item should not be visible after context change to false", tbm.getItems()[0].isVisible());
+		assertFalse("Model item should not be visible after context change to false", toolItem.isVisible());
+	}
+
 	private ToolBarManagerRenderer getToolBarManagerRenderer() {
 		Object renderer = toolBar.getRenderer();
 		assertEquals(ToolBarManagerRenderer.class, renderer.getClass());

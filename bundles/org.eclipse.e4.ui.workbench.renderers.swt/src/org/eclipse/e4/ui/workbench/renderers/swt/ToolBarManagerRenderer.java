@@ -35,6 +35,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.core.expressions.ExpressionInfo;
+import org.eclipse.e4.core.commands.ExpressionContext;
 import org.eclipse.e4.core.contexts.ContextInjectionFactory;
 import org.eclipse.e4.core.contexts.IContextFunction;
 import org.eclipse.e4.core.contexts.IEclipseContext;
@@ -618,6 +619,7 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		if (parentManager == null) {
 			return;
 		}
+		MToolBar toolbarModel = (MToolBar) obj;
 		// Process any contents of the newly created ME
 		List<MUIElement> parts = container.getChildren();
 		if (parts != null) {
@@ -626,6 +628,9 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 				modelProcessSwitch(parentManager, (MToolBarElement) childME);
 			}
 		}
+		
+		// Set up visibility tracking for direct toolbar items with visibleWhen expressions
+		setupVisibilityTracking(toolbarModel, parentManager);
 
 		updateWidget(parentManager);
 	}
@@ -966,6 +971,144 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 
 	/* package */ ToolItemUpdater getUpdater() {
 		return enablementUpdater;
+	}
+
+	/**
+	 * Sets up visibility tracking for toolbar items that have visibleWhen expressions.
+	 * For items that are not from contributions, this creates a RunAndTrack that will
+	 * update their visibility when the expression context changes.
+	 *
+	 * @param toolbarModel the toolbar model containing the items
+	 * @param manager the toolbar manager
+	 */
+	private void setupVisibilityTracking(MToolBar toolbarModel, ToolBarManager manager) {
+		List<MToolBarElement> itemsToTrack = new ArrayList<>();
+		
+		// Find items that need visibility tracking
+		for (MToolBarElement item : toolbarModel.getChildren()) {
+			// Only track items that are NOT from contributions (contributions have their own tracking)
+			// and have a visibleWhen expression
+			ToolBarContributionRecord record = getContributionRecord(item);
+			if (record == null && requiresVisibilityCheck(item)) {
+				itemsToTrack.add(item);
+			}
+		}
+		
+		if (itemsToTrack.isEmpty()) {
+			return;
+		}
+		
+		// Collect expression info to determine which variables to track
+		ExpressionInfo info = new ExpressionInfo();
+		for (MToolBarElement item : itemsToTrack) {
+			ContributionsAnalyzer.collectInfo(info, item.getVisibleWhen());
+		}
+		updateVariables.addAll(Arrays.asList(info.getAccessedVariableNames()));
+		
+		final IEclipseContext parentContext = getContext(toolbarModel);
+		parentContext.runAndTrack(new RunAndTrack() {
+			@Override
+			public boolean changed(IEclipseContext context) {
+				if (getManager(toolbarModel) == null) {
+					// toolbar no longer being managed, ignore it
+					return false;
+				}
+				
+				ExpressionContext exprContext = new ExpressionContext(parentContext.getActiveLeaf());
+				boolean changed = false;
+				
+				for (MToolBarElement item : itemsToTrack) {
+					// Check if item still exists in the toolbar
+					if (!toolbarModel.getChildren().contains(item)) {
+						continue;
+					}
+					
+					boolean currentVisibility = item.isVisible();
+					boolean newVisibility = computeItemVisibility(item, exprContext);
+					
+					if (currentVisibility != newVisibility) {
+						item.setVisible(newVisibility);
+						changed = true;
+					}
+				}
+				
+				if (changed) {
+					runExternalCode(() -> {
+						manager.update(false);
+						getUpdater().updateContributionItems(e -> {
+							if (e instanceof MToolBarElement) {
+								if (((MUIElement) ((MToolBarElement) e).getParent()) == toolbarModel) {
+									return true;
+								}
+							}
+							return false;
+						});
+					});
+				}
+				return true;
+			}
+		});
+	}
+	
+	/**
+	 * Checks if a toolbar element requires visibility checking.
+	 */
+	private boolean requiresVisibilityCheck(MToolBarElement element) {
+		return element.getVisibleWhen() != null
+				|| element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER) != null;
+	}
+	
+	/**
+	 * Computes the visibility for a toolbar element based on its expressions.
+	 */
+	private boolean computeItemVisibility(MToolBarElement item, ExpressionContext exprContext) {
+		boolean visible = true;
+		
+		if (item.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER) != null) {
+			String identifier = item.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER);
+			Object rc = exprContext.eclipseContext.get(identifier);
+			if (rc instanceof Boolean) {
+				visible = ((Boolean) rc).booleanValue();
+			}
+		}
+		
+		if (visible && item.getVisibleWhen() != null) {
+			visible = ContributionsAnalyzer.isVisible(item.getVisibleWhen(), exprContext);
+		}
+		
+		return visible;
+	}
+
+	/**
+	 * Updates the visibility of a toolbar element based on its visibleWhen expression.
+	 * This method evaluates the visibleWhen expression (including imperative expressions
+	 * with @Evaluate) and updates the element's visibility accordingly.
+	 *
+	 * @param toolBarManager the toolbar manager containing the element
+	 * @param element the toolbar element whose visibility should be updated
+	 * @param evalContext the expression context for evaluating expressions
+	 */
+	public static void updateVisibility(ToolBarManager toolBarManager, MToolBarElement element,
+			ExpressionContext evalContext) {
+		boolean current = element.isVisible();
+		boolean visible = true;
+		boolean evaluated = false;
+		if (element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER) != null) {
+			evaluated = true;
+			String identifier = element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER);
+			Object rc = evalContext.eclipseContext.get(identifier);
+			if (rc instanceof Boolean) {
+				visible = ((Boolean) rc).booleanValue();
+			}
+		}
+		if (visible && element.getVisibleWhen() != null) {
+			evaluated = true;
+			visible = ContributionsAnalyzer.isVisible(element.getVisibleWhen(), evalContext);
+		}
+		if (evaluated && visible != current) {
+			element.setVisible(visible);
+			toolBarManager.markDirty();
+		}
 	}
 
 }
