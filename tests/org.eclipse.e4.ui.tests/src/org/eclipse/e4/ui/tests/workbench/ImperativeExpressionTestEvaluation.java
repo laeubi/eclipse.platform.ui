@@ -20,7 +20,7 @@ import org.eclipse.e4.core.di.annotations.Optional;
 
 public class ImperativeExpressionTestEvaluation {
 	@Evaluate
-	public boolean isVisible(@Optional @Named("mmc1") boolean mmc1) {
-		return mmc1;
+	public boolean isVisible(@Optional @Named("mmc1") String mmc1) {
+		return Boolean.parseBoolean(mmc1);
 	}
 }
