@@ -718,7 +718,8 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		// and is not from a contribution (contributions handle their own visibility)
 		ToolBarContributionRecord record = getContributionRecord(childME);
 		if (record == null && requiresVisibilityCheck(childME)) {
-			MToolBar toolbarModel = (MToolBar) childME.getParent();
+			MElementContainer<?> parent = childME.getParent();
+			MToolBar toolbarModel = (MToolBar) parent;
 			IEclipseContext parentContext = getContext(toolbarModel);
 			if (parentContext != null) {
 				ExpressionContext exprContext = new ExpressionContext(parentContext.getActiveLeaf());
