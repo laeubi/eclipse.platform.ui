@@ -1031,7 +1031,14 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 				}
 				
 				// Update the set of variables to track
-				updateVariables.addAll(Arrays.asList(info.getAccessedVariableNames()));
+				String[] variableNames = info.getAccessedVariableNames();
+				updateVariables.addAll(Arrays.asList(variableNames));
+				
+				// CRITICAL: Access each variable to register it as a dependency for this RunAndTrack
+				// This ensures the RunAndTrack is triggered when any of these variables change
+				for (String var : variableNames) {
+					context.get(var);
+				}
 				
 				ExpressionContext exprContext = new ExpressionContext(parentContext.getActiveLeaf());
 				boolean visibilityChanged = false;
