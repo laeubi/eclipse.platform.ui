@@ -490,6 +490,7 @@ public class ToolBarManagerRendererTest {
 	@Test
 	public void testVisibilityOfToolBarItemChangesBasedOnImperativeExpression() {
 		contextRule.createAndRunWorkbench(window);
+		window.getContext().declareModifiable("mmc1");
 		// Create a direct tool item with imperative expression
 		MDirectToolItem toolItem = ems.createModelElement(MDirectToolItem.class);
 		toolItem.setElementId("testToolItem");
@@ -515,14 +516,14 @@ public class ToolBarManagerRendererTest {
 
 		// Set mmc1 to true - this should trigger the imperative expression to evaluate to true
 		// The RunAndTrack should automatically update the visibility
-		window.getContext().set("mmc1", Boolean.TRUE);
+		window.getContext().set("mmc1", "true");
 
 		// Tool item should now be visible
 		assertTrue("Tool item should be visible after context change", tbm.getItems()[0].isVisible());
 		assertTrue("Model item should be visible after context change", toolItem.isVisible());
 
 		// Set mmc1 to false - this should trigger the imperative expression to evaluate to false
-		window.getContext().set("mmc1", Boolean.FALSE);
+		window.getContext().set("mmc1", "false");
 
 		// Tool item should not be visible again
 		assertFalse("Tool item should not be visible after context change to false", tbm.getItems()[0].isVisible());
