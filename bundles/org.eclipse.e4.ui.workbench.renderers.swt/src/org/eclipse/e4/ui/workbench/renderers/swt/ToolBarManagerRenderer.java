@@ -713,6 +713,21 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		} else if (childME instanceof MToolControl itemModel) {
 			processToolControl(parentManager, itemModel);
 		}
+		
+		// After creating the item, evaluate its visibility if it has a visibleWhen expression
+		// and is not from a contribution (contributions handle their own visibility)
+		ToolBarContributionRecord record = getContributionRecord(childME);
+		if (record == null && requiresVisibilityCheck(childME)) {
+			MToolBar toolbarModel = (MToolBar) childME.getParent();
+			IEclipseContext parentContext = getContext(toolbarModel);
+			if (parentContext != null) {
+				ExpressionContext exprContext = new ExpressionContext(parentContext.getActiveLeaf());
+				boolean newVisibility = computeItemVisibility(childME, exprContext);
+				if (childME.isVisible() != newVisibility) {
+					childME.setVisible(newVisibility);
+				}
+			}
+		}
 	}
 
 	private void processSeparator(ToolBarManager parentManager, MToolBarSeparator itemModel) {
