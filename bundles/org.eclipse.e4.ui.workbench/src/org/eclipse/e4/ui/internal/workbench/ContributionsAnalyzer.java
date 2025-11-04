@@ -63,10 +63,36 @@ import org.eclipse.e4.ui.workbench.IWorkbench;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 
+/**
+ * Utility class for analyzing, gathering, merging, and processing UI contributions
+ * in the Eclipse 4 workbench model.
+ * <p>
+ * This class provides functionality for:
+ * <ul>
+ * <li>Gathering menu, toolbar, and trim contributions based on parent IDs and visibility conditions</li>
+ * <li>Evaluating visibility expressions (both core expressions and imperative expressions)</li>
+ * <li>Merging multiple contributions into consolidated structures</li>
+ * <li>Adding contributions to their target UI elements (menus, toolbars, trim bars)</li>
+ * <li>Managing contribution positioning and ordering within parent containers</li>
+ * </ul>
+ * <p>
+ * The class handles the Eclipse 4 contribution system which allows UI elements
+ * to be dynamically added to menus, toolbars, and other UI containers through
+ * declarative contributions that can have visibility conditions and specific
+ * positioning requirements.
+ *
+ * @since 1.0
+ */
 public final class ContributionsAnalyzer {
 
 	private static final Object missingEvaluate = new Object();
 
+	/**
+	 * Writes a trace message to the debug log if DEBUG is enabled.
+	 *
+	 * @param msg the message to trace
+	 * @param error the error to trace, or {@code null} if no error
+	 */
 	public static void trace(String msg, Throwable error) {
 		if (DEBUG) {
 			Activator.trace(Policy.DEBUG_MENUS_FLAG, msg, error);
@@ -79,6 +105,19 @@ public final class ContributionsAnalyzer {
 		trace(msg + ": " + menu + ": " + menuModel, null); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
+	/**
+	 * Gathers trim contributions that should be applied to a trim bar with the specified element ID.
+	 * <p>
+	 * This method filters the provided list of trim contributions and adds those that:
+	 * <ul>
+	 * <li>Have a parent ID matching the given element ID</li>
+	 * <li>Are marked as "to be rendered"</li>
+	 * </ul>
+	 *
+	 * @param trimContributions the list of all available trim contributions to search through
+	 * @param elementId the ID of the trim bar element to gather contributions for
+	 * @param toContribute the output list where matching contributions will be added
+	 */
 	public static void gatherTrimContributions(List<MTrimContribution> trimContributions, String elementId,
 			ArrayList<MTrimContribution> toContribute) {
 		if (elementId == null || elementId.isEmpty()) {
@@ -94,6 +133,21 @@ public final class ContributionsAnalyzer {
 	}
 
 
+	/**
+	 * Gathers toolbar contributions that should be applied to a toolbar with the specified ID.
+	 * <p>
+	 * This method filters the provided list of toolbar contributions and adds those that:
+	 * <ul>
+	 * <li>Have a parent ID matching the given ID</li>
+	 * <li>Are marked as "to be rendered"</li>
+	 * </ul>
+	 * <p>
+	 * Note: This method is prefixed with "XXX" indicating it may be deprecated or under review.
+	 *
+	 * @param toolbarContributionList the list of all available toolbar contributions to search through
+	 * @param id the ID of the toolbar to gather contributions for
+	 * @param toContribute the output list where matching contributions will be added
+	 */
 	public static void XXXgatherToolBarContributions(final List<MToolBarContribution> toolbarContributionList,
 			final String id,
 			final ArrayList<MToolBarContribution> toContribute) {
@@ -109,6 +163,32 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Gathers menu contributions that should be applied to a menu with the specified ID.
+	 * <p>
+	 * This method filters the provided list of menu contributions based on:
+	 * <ul>
+	 * <li>Parent ID matching</li>
+	 * <li>Popup menu handling (if includePopups is true)</li>
+	 * <li>Menu vs popup filtering based on tags</li>
+	 * <li>Render visibility</li>
+	 * </ul>
+	 * <p>
+	 * Special handling includes:
+	 * <ul>
+	 * <li>Support for popup menu IDs from the menu model's tags (e.g., "popup:*")</li>
+	 * <li>Support for POPUP_PARENT_ID ("popup") for contributions to any popup menu</li>
+	 * <li>Filtering based on MC_MENU and MC_POPUP tags to prevent cross-contamination</li>
+	 * </ul>
+	 * <p>
+	 * Note: This method is prefixed with "XXX" indicating it may be deprecated or under review.
+	 *
+	 * @param menuModel the menu model to gather contributions for
+	 * @param menuContributionList the list of all available menu contributions
+	 * @param id the ID of the menu to gather contributions for
+	 * @param toContribute the output list where matching contributions will be added
+	 * @param includePopups whether to include popup-specific contributions
+	 */
 	public static void XXXgatherMenuContributions(final MMenu menuModel,
 			final List<MMenuContribution> menuContributionList, final String id,
 			final ArrayList<MMenuContribution> toContribute, boolean includePopups) {
@@ -151,6 +231,29 @@ public final class ContributionsAnalyzer {
 		toContribute.addAll(includedPopups);
 	}
 
+	/**
+	 * Gathers menu contributions that should be applied to a menu with the specified ID,
+	 * with visibility evaluation using the provided expression context.
+	 * <p>
+	 * This is the preferred method for gathering menu contributions as it evaluates
+	 * visibility expressions. Contributions are filtered based on:
+	 * <ul>
+	 * <li>Parent ID matching the specified id or POPUP_PARENT_ID for popup menus</li>
+	 * <li>Tag-based filtering (MC_MENU vs MC_POPUP)</li>
+	 * <li>Render visibility flag</li>
+	 * <li>Visibility expression evaluation (for non-menubar menus)</li>
+	 * </ul>
+	 * <p>
+	 * Note: Menu bar contributions skip visibility evaluation and are always included
+	 * if they match the parent ID and are marked to be rendered.
+	 *
+	 * @param menuModel the menu model to gather contributions for
+	 * @param menuContributionList the list of all available menu contributions
+	 * @param id the ID of the menu to gather contributions for
+	 * @param toContribute the output list where matching and visible contributions will be added
+	 * @param eContext the expression context used to evaluate visibility expressions
+	 * @param includePopups whether to include popup-specific contributions
+	 */
 	public static void gatherMenuContributions(final MMenu menuModel,
 			final List<MMenuContribution> menuContributionList, final String id,
 			final ArrayList<MMenuContribution> toContribute, final ExpressionContext eContext,
@@ -177,6 +280,23 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Determines if a menu contribution should be filtered out based on menu type and contribution tags.
+	 * <p>
+	 * The filtering logic is:
+	 * <ul>
+	 * <li>If the menu is a popup or includePopups is true: filter out contributions tagged with
+	 * MC_MENU but not MC_POPUP</li>
+	 * <li>If the menu is tagged with MC_MENU: filter out contributions tagged with MC_POPUP
+	 * but not MC_MENU</li>
+	 * <li>If includePopups is false: filter out all contributions tagged with MC_POPUP</li>
+	 * </ul>
+	 *
+	 * @param menuModel the menu model being processed
+	 * @param menuContribution the contribution to check for filtering
+	 * @param includePopups whether popup contributions are being included
+	 * @return {@code true} if the contribution should be filtered out, {@code false} otherwise
+	 */
 	static boolean isFiltered(MMenu menuModel, MMenuContribution menuContribution,
 			boolean includePopups) {
 		if (includePopups || menuModel.getTags().contains(ContributionsAnalyzer.MC_POPUP)) {
@@ -195,6 +315,16 @@ public final class ContributionsAnalyzer {
 		return false;
 	}
 
+	/**
+	 * Collects information about variables accessed by a core expression.
+	 * <p>
+	 * This method extracts the expression from the MExpression model element and
+	 * collects information about which variables the expression accesses. This
+	 * information is used to track dependencies and for expression evaluation.
+	 *
+	 * @param info the ExpressionInfo object to populate with accessed variable information
+	 * @param exp the expression to analyze
+	 */
 	public static void collectInfo(ExpressionInfo info, MExpression exp) {
 		if (!(exp instanceof MCoreExpression expr)) {
 			return;
@@ -209,6 +339,13 @@ public final class ContributionsAnalyzer {
 		ref.collectExpressionInfo(info);
 	}
 
+	/**
+	 * Evaluates whether a menu contribution is visible based on its visibleWhen expression.
+	 *
+	 * @param menuContribution the menu contribution to check
+	 * @param eContext the expression context for evaluation
+	 * @return {@code true} if the contribution should be visible, {@code false} otherwise
+	 */
 	public static boolean isVisible(MMenuContribution menuContribution, ExpressionContext eContext) {
 		if (menuContribution.getVisibleWhen() == null) {
 			return true;
@@ -216,6 +353,13 @@ public final class ContributionsAnalyzer {
 		return isVisible(menuContribution.getVisibleWhen(), eContext);
 	}
 
+	/**
+	 * Evaluates whether a toolbar contribution is visible based on its visibleWhen expression.
+	 *
+	 * @param contribution the toolbar contribution to check
+	 * @param eContext the expression context for evaluation
+	 * @return {@code true} if the contribution should be visible, {@code false} otherwise
+	 */
 	public static boolean isVisible(MToolBarContribution contribution, ExpressionContext eContext) {
 		if (contribution.getVisibleWhen() == null) {
 			return true;
@@ -223,6 +367,13 @@ public final class ContributionsAnalyzer {
 		return isVisible(contribution.getVisibleWhen(), eContext);
 	}
 
+	/**
+	 * Evaluates whether a trim contribution is visible based on its visibleWhen expression.
+	 *
+	 * @param contribution the trim contribution to check
+	 * @param eContext the expression context for evaluation
+	 * @return {@code true} if the contribution should be visible, {@code false} otherwise
+	 */
 	public static boolean isVisible(MTrimContribution contribution, ExpressionContext eContext) {
 		if (contribution.getVisibleWhen() == null) {
 			return true;
@@ -230,6 +381,16 @@ public final class ContributionsAnalyzer {
 		return isVisible(contribution.getVisibleWhen(), eContext);
 	}
 
+	/**
+	 * Evaluates whether an expression evaluates to visible/true.
+	 * <p>
+	 * This method handles both core expressions (Eclipse expression framework) and
+	 * imperative expressions (custom evaluation code).
+	 *
+	 * @param exp the expression to evaluate
+	 * @param eContext the expression context for evaluation
+	 * @return {@code true} if the expression evaluates to visible, {@code false} otherwise
+	 */
 	public static boolean isVisible(MExpression exp, final ExpressionContext eContext) {
 		if (exp instanceof MCoreExpression coreExpression) {
 			return isCoreExpressionVisible(coreExpression, eContext);
@@ -240,6 +401,20 @@ public final class ContributionsAnalyzer {
 		return true;
 	}
 
+	/**
+	 * Evaluates a core expression in the provided context.
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Extracts or creates the Eclipse expression from the model element</li>
+	 * <li>Creates dependencies on evaluation service variables for reactive evaluation</li>
+	 * <li>Evaluates the expression and returns whether it's visible (not FALSE)</li>
+	 * </ul>
+	 *
+	 * @param coreExpression the core expression to evaluate
+	 * @param eContext the expression context for evaluation
+	 * @return {@code true} if the expression does not evaluate to FALSE, {@code false} otherwise
+	 */
 	private static boolean isCoreExpressionVisible(MCoreExpression coreExpression, final ExpressionContext eContext) {
 		final Expression ref;
 		if (coreExpression.getCoreExpression() instanceof Expression) {
@@ -267,6 +442,21 @@ public final class ContributionsAnalyzer {
 		return ret;
 	}
 
+	/**
+	 * Evaluates an imperative expression (custom Java code) in the provided context.
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Creates the imperative expression object from its contribution URI if needed</li>
+	 * <li>Invokes the @Evaluate annotated method on the expression object</li>
+	 * <li>Handles tracking vs non-tracking evaluation modes</li>
+	 * </ul>
+	 *
+	 * @param exp the imperative expression to evaluate
+	 * @param eContext the expression context for evaluation
+	 * @return {@code true} if the expression evaluates to true, {@code false} otherwise
+	 * @throws IllegalStateException if the expression object has no @Evaluate annotated method
+	 */
 	private static boolean isImperativeExpressionVisible(MImperativeExpression exp, final ExpressionContext eContext) {
 		Object imperativeExpressionObject = exp.getObject();
 		if (imperativeExpressionObject == null) {
@@ -311,6 +501,20 @@ public final class ContributionsAnalyzer {
 
 	final private static InjectorImpl injector = (InjectorImpl) InjectorFactory.getDefault();
 
+	/**
+	 * Invokes a method with the specified qualifier annotation on an object using dependency injection.
+	 * <p>
+	 * This is a helper method for invoking annotated methods (like @Evaluate) with proper
+	 * context injection.
+	 *
+	 * @param object the object on which to invoke the method
+	 * @param qualifier the annotation class qualifying the method to invoke
+	 * @param context the primary Eclipse context for injection
+	 * @param localContext the local/temporary context for injection
+	 * @param defaultValue the value to return if no matching method is found
+	 * @return the result of the method invocation
+	 * @throws InjectionException if injection or invocation fails
+	 */
 	static private Object invoke(Object object, Class<? extends Annotation> qualifier, IEclipseContext context,
 			IEclipseContext localContext, Object defaultValue) throws InjectionException {
 		PrimaryObjectSupplier supplier = ContextObjectSupplier.getObjectSupplier(context, injector);
@@ -318,6 +522,22 @@ public final class ContributionsAnalyzer {
 		return injector.invoke(object, qualifier, defaultValue, supplier, tempSupplier, false, true);
 	}
 
+	/**
+	 * Adds menu contributions to a menu model, processing them in the order specified
+	 * by their position requirements.
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Tracks existing menu and separator IDs to avoid duplicates</li>
+	 * <li>Processes contributions in multiple passes if positioning dependencies exist</li>
+	 * <li>Adds contributed menu elements at the appropriate positions</li>
+	 * <li>Records added elements for later removal if needed</li>
+	 * </ul>
+	 *
+	 * @param menuModel the menu to add contributions to
+	 * @param toContribute the list of contributions to add
+	 * @param menuContributionsToRemove output list to track added elements for later removal
+	 */
 	public static void addMenuContributions(final MMenu menuModel,
 			final ArrayList<MMenuContribution> toContribute,
 			final ArrayList<MMenuElement> menuContributionsToRemove) {
@@ -351,6 +571,25 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Processes a single menu contribution, adding its children to the menu model.
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Determines the insertion index based on the contribution's position specification</li>
+	 * <li>Skips duplicate menus and separators (based on element IDs)</li>
+	 * <li>Creates copies of the contribution's children and inserts them</li>
+	 * <li>Updates tracking sets for duplicate detection</li>
+	 * </ul>
+	 *
+	 * @param menuModel the menu to add contributions to
+	 * @param menuContributionsToRemove list to track added elements for later removal
+	 * @param menuContribution the contribution to process
+	 * @param existingMenuIds set of existing menu IDs for duplicate detection
+	 * @param existingSeparatorNames set of existing separator IDs for duplicate detection
+	 * @return {@code true} if the contribution was successfully processed, {@code false} if
+	 *         the position reference was not found
+	 */
 	public static boolean processAddition(final MMenu menuModel,
 			final ArrayList<MMenuElement> menuContributionsToRemove,
 			MMenuContribution menuContribution, final HashSet<String> existingMenuIds,
@@ -383,6 +622,24 @@ public final class ContributionsAnalyzer {
 		return true;
 	}
 
+	/**
+	 * Processes a single toolbar contribution, adding its children to the toolbar model.
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Determines the insertion index based on the contribution's position specification</li>
+	 * <li>Skips duplicate separators (based on element IDs)</li>
+	 * <li>Creates copies of the contribution's children and inserts them</li>
+	 * <li>Updates tracking set for duplicate separator detection</li>
+	 * </ul>
+	 *
+	 * @param toolBarModel the toolbar to add contributions to
+	 * @param toolBarContribution the contribution to process
+	 * @param contributions list to track added elements for later removal
+	 * @param existingSeparatorNames set of existing separator IDs for duplicate detection
+	 * @return {@code true} if the contribution was successfully processed, {@code false} if
+	 *         the position reference was not found
+	 */
 	public static boolean processAddition(final MToolBar toolBarModel,
 			MToolBarContribution toolBarContribution, List<MToolBarElement> contributions,
 			HashSet<String> existingSeparatorNames) {
@@ -409,6 +666,25 @@ public final class ContributionsAnalyzer {
 		return true;
 	}
 
+	/**
+	 * Processes a single trim contribution, adding its children to the trim bar.
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Determines the insertion index based on the contribution's position specification</li>
+	 * <li>Skips duplicate toolbars (based on element IDs)</li>
+	 * <li>Creates copies of the contribution's children and inserts them</li>
+	 * <li>Marks contributed items as non-persistent</li>
+	 * <li>Updates tracking set for duplicate toolbar detection</li>
+	 * </ul>
+	 *
+	 * @param trimBar the trim bar to add contributions to
+	 * @param contribution the contribution to process
+	 * @param contributions list to track added elements for later removal
+	 * @param existingToolbarIds set of existing toolbar IDs for duplicate detection
+	 * @return {@code true} if the contribution was successfully processed, {@code false} if
+	 *         the position reference was not found
+	 */
 	public static boolean processAddition(final MTrimBar trimBar, MTrimContribution contribution,
 			List<MTrimElement> contributions, HashSet<String> existingToolbarIds) {
 		int idx = getIndex(trimBar, contribution.getPositionInParent());
@@ -434,6 +710,20 @@ public final class ContributionsAnalyzer {
 		return true;
 	}
 
+	/**
+	 * Calculates the insertion index for a contribution based on its position specification.
+	 * <p>
+	 * Position format: "modifier=elementId" where:
+	 * <ul>
+	 * <li>modifier is "before" or "after" (default is before)</li>
+	 * <li>elementId is the ID of the reference element</li>
+	 * <li>Special case: "additions" always returns the end of the list</li>
+	 * </ul>
+	 *
+	 * @param menuModel the container to find the position in
+	 * @param positionInParent the position specification string
+	 * @return the insertion index, or -1 if the reference element was not found (except for "additions")
+	 */
 	private static int getIndex(MElementContainer<?> menuModel, String positionInParent) {
 		String id = null;
 		String modifier = null;
@@ -463,10 +753,30 @@ public final class ContributionsAnalyzer {
 		return id.equals("additions") ? menuModel.getChildren().size() : -1; //$NON-NLS-1$
 	}
 
+	/**
+	 * Retrieves a command by its ID from the application model.
+	 *
+	 * @param app the application model
+	 * @param cmdId the command ID to look up
+	 * @return the command with the specified ID, or {@code null} if not found
+	 */
 	public static MCommand getCommandById(MApplication app, String cmdId) {
 		return app.getCommand(cmdId);
 	}
 
+	/**
+	 * Base class for contribution keys used in merging contributions.
+	 * <p>
+	 * A key identifies a unique contribution based on:
+	 * <ul>
+	 * <li>Parent ID - where the contribution is going</li>
+	 * <li>Position - where in the parent it should be placed</li>
+	 * <li>Scheme tag - the type of contribution (menu, popup, toolbar)</li>
+	 * <li>Visibility expression - when it should be visible</li>
+	 * <li>Factory - the contribution factory that created it</li>
+	 * </ul>
+	 * Contributions with the same key can be merged together.
+	 */
 	static class Key {
 		private int tag = -1;
 		private int hc = -1;
@@ -528,6 +838,12 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Key implementation for menu contributions.
+	 * <p>
+	 * Associates a MenuKey with its corresponding MMenuContribution and stores
+	 * the key in the contribution's widget field for efficient retrieval.
+	 */
 	static class MenuKey extends Key {
 		static final String FACTORY = "ContributionFactory"; //$NON-NLS-1$
 		private final MMenuContribution contribution;
@@ -544,6 +860,12 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Key implementation for toolbar contributions.
+	 * <p>
+	 * Associates a ToolBarKey with its corresponding MToolBarContribution and stores
+	 * the key in the contribution's widget field for efficient retrieval.
+	 */
 	static class ToolBarKey extends Key {
 		static final String FACTORY = "ToolBarContributionFactory"; //$NON-NLS-1$
 		private final MToolBarContribution contribution;
@@ -560,6 +882,12 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Key implementation for trim contributions.
+	 * <p>
+	 * Associates a TrimKey with its corresponding MTrimContribution and stores
+	 * the key in the contribution's widget field for efficient retrieval.
+	 */
 	static class TrimKey extends Key {
 		private final MTrimContribution contribution;
 
@@ -596,6 +924,11 @@ public final class ContributionsAnalyzer {
 		return new TrimKey(contribution);
 	}
 
+	/**
+	 * Debugging utility to print menu contributions and their children.
+	 *
+	 * @param contributions the list of contributions to print
+	 */
 	public static void printContributions(ArrayList<MMenuContribution> contributions) {
 		if (!DEBUG) {
 			return;
@@ -622,6 +955,20 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Merges toolbar contributions that have the same key (parent, position, visibility, etc.).
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Groups contributions by their ToolBarKey</li>
+	 * <li>Combines children from contributions with matching keys</li>
+	 * <li>Removes duplicates (same element ID and type for separators/toolbars)</li>
+	 * <li>Produces a consolidated list of unique contributions</li>
+	 * </ul>
+	 *
+	 * @param contributions the list of toolbar contributions to merge
+	 * @param result the output list for merged contributions
+	 */
 	public static void mergeToolBarContributions(ArrayList<MToolBarContribution> contributions,
 			ArrayList<MToolBarContribution> result) {
 		HashMap<ToolBarKey, ArrayList<MToolBarContribution>> buckets = new HashMap<>();
@@ -670,6 +1017,21 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Merges menu contributions that have the same key (parent, position, visibility, etc.).
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Groups contributions by their MenuKey</li>
+	 * <li>Combines children from contributions with matching keys</li>
+	 * <li>Respects positioning requirements when merging</li>
+	 * <li>Removes duplicates (same element ID and type for separators/menus)</li>
+	 * <li>Produces a consolidated list of unique contributions</li>
+	 * </ul>
+	 *
+	 * @param contributions the list of menu contributions to merge
+	 * @param result the output list for merged contributions
+	 */
 	public static void mergeContributions(ArrayList<MMenuContribution> contributions,
 			ArrayList<MMenuContribution> result) {
 		HashMap<MenuKey, ArrayList<MMenuContribution>> buckets = new HashMap<>();
@@ -722,6 +1084,16 @@ public final class ContributionsAnalyzer {
 		trace("mergeContributions: final size: " + result.size(), null); //$NON-NLS-1$
 	}
 
+	/**
+	 * Checks if a list of menu elements contains a matching element.
+	 * <p>
+	 * Two elements match if they have the same element ID, compatible types,
+	 * and are either separators or menus (items are not checked for matches).
+	 *
+	 * @param children the list to search
+	 * @param me the element to find a match for
+	 * @return {@code true} if a matching element is found, {@code false} otherwise
+	 */
 	private static boolean containsMatching(List<MMenuElement> children, MMenuElement me) {
 		for (MMenuElement element : children) {
 			if (Objects.equals(me.getElementId(), element.getElementId())
@@ -733,6 +1105,16 @@ public final class ContributionsAnalyzer {
 		return false;
 	}
 
+	/**
+	 * Checks if a list of toolbar elements contains a matching element.
+	 * <p>
+	 * Two elements match if they have the same element ID, compatible types,
+	 * and are either separators or toolbars.
+	 *
+	 * @param children the list to search
+	 * @param me the element to find a match for
+	 * @return {@code true} if a matching element is found, {@code false} otherwise
+	 */
 	private static boolean containsMatching(List<MToolBarElement> children, MToolBarElement me) {
 		for (MToolBarElement element : children) {
 			if (Objects.equals(me.getElementId(), element.getElementId())
@@ -744,6 +1126,16 @@ public final class ContributionsAnalyzer {
 		return false;
 	}
 
+	/**
+	 * Checks if a list of trim elements contains a matching element.
+	 * <p>
+	 * Two elements match if they have the same element ID, compatible types,
+	 * and are either separators or toolbars.
+	 *
+	 * @param children the list to search
+	 * @param me the element to find a match for
+	 * @return {@code true} if a matching element is found, {@code false} otherwise
+	 */
 	private static boolean containsMatching(List<MTrimElement> children, MTrimElement me) {
 		for (MTrimElement element : children) {
 			if (Objects.equals(me.getElementId(), element.getElementId())
@@ -755,6 +1147,13 @@ public final class ContributionsAnalyzer {
 		return false;
 	}
 
+	/**
+	 * Finds the index of a menu element with the specified ID in a parent menu.
+	 *
+	 * @param parentMenu the parent menu container to search
+	 * @param id the element ID to find
+	 * @return the index of the element, or -1 if not found or if id is null/empty
+	 */
 	public static int indexForId(MElementContainer<MMenuElement> parentMenu, String id) {
 		if (id == null || id.isEmpty()) {
 			return -1;
@@ -769,11 +1168,29 @@ public final class ContributionsAnalyzer {
 		return -1;
 	}
 
+	/** Tag constant for popup menu contributions */
 	public static final String MC_POPUP = "menuContribution:popup"; //$NON-NLS-1$
+	/** Tag constant for menu bar menu contributions */
 	public static final String MC_MENU = "menuContribution:menu"; //$NON-NLS-1$
+	/** Tag constant for toolbar contributions */
 	public static final String MC_TOOLBAR = "menuContribution:toolbar"; //$NON-NLS-1$
+	/** Parent ID for contributions that apply to any popup menu */
 	public static final String POPUP_PARENT_ID = "popup"; //$NON-NLS-1$
 
+	/**
+	 * Merges trim contributions that have the same key (parent, position, visibility, etc.).
+	 * <p>
+	 * This method:
+	 * <ul>
+	 * <li>Groups contributions by their TrimKey</li>
+	 * <li>Combines children from contributions with matching keys</li>
+	 * <li>Removes duplicates (same element ID and type for toolbars)</li>
+	 * <li>Produces a consolidated list of unique contributions</li>
+	 * </ul>
+	 *
+	 * @param contributions the list of trim contributions to merge
+	 * @param result the output list for merged contributions
+	 */
 	public static void mergeTrimContributions(ArrayList<MTrimContribution> contributions,
 			ArrayList<MTrimContribution> result) {
 		HashMap<TrimKey, ArrayList<MTrimContribution>> buckets = new HashMap<>();
@@ -822,6 +1239,17 @@ public final class ContributionsAnalyzer {
 		}
 	}
 
+	/**
+	 * Populates an Eclipse context with all the interfaces implemented by a model object.
+	 * <p>
+	 * This method recursively adds the model object to the context under the name of each
+	 * interface it implements, making it available for dependency injection lookups by
+	 * interface type.
+	 *
+	 * @param modelObject the model object to populate into the context
+	 * @param context the Eclipse context to populate
+	 * @param interfaces the array of interfaces to register
+	 */
 	public static void populateModelInterfaces(Object modelObject, IEclipseContext context,
 			Class<?>[] interfaces) {
 		for (Class<?> intf : interfaces) {
