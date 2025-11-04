@@ -80,8 +80,6 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
  * to be dynamically added to menus, toolbars, and other UI containers through
  * declarative contributions that can have visibility conditions and specific
  * positioning requirements.
- *
- * @since 1.0
  */
 public final class ContributionsAnalyzer {
 
@@ -142,8 +140,9 @@ public final class ContributionsAnalyzer {
 	 * <li>Are marked as "to be rendered"</li>
 	 * </ul>
 	 * <p>
-	 * Note: This is a legacy method prefixed with "XXX". It does not evaluate visibility expressions.
-	 * It is kept for backward compatibility with existing code.
+	 * Note: This method name is prefixed with "XXX" to indicate it is a legacy implementation
+	 * that does not perform visibility expression evaluation. It is maintained for backward
+	 * compatibility with existing renderers.
 	 *
 	 * @param toolbarContributionList the list of all available toolbar contributions to search through
 	 * @param id the ID of the toolbar to gather contributions for
@@ -182,9 +181,11 @@ public final class ContributionsAnalyzer {
 	 * <li>Filtering based on MC_MENU and MC_POPUP tags to prevent cross-contamination</li>
 	 * </ul>
 	 * <p>
-	 * Note: This is a legacy method prefixed with "XXX". It does not evaluate visibility expressions.
-	 * Consider using {@link #gatherMenuContributions(MMenu, List, String, ArrayList, ExpressionContext, boolean)}
-	 * for visibility-aware contribution gathering.
+	 * Note: This method name is prefixed with "XXX" to indicate it is a legacy implementation
+	 * that does not perform visibility expression evaluation. It is maintained for backward
+	 * compatibility with existing renderers. Consider using the visibility-aware variant:
+	 * {@link #gatherMenuContributions(MMenu, List, String, ArrayList, ExpressionContext, boolean)
+	 * gatherMenuContributions(MMenu, List, String, ArrayList, ExpressionContext, boolean)}.
 	 *
 	 * @param menuModel the menu model to gather contributions for
 	 * @param menuContributionList the list of all available menu contributions
