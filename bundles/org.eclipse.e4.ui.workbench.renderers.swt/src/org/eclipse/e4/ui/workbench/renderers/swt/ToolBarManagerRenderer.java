@@ -977,34 +977,14 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 	 * Sets up visibility tracking for toolbar items that have visibleWhen expressions.
 	 * For items that are not from contributions, this creates a RunAndTrack that will
 	 * update their visibility when the expression context changes.
+	 * 
+	 * This handles dynamic additions/removals by checking all toolbar items each time
+	 * the context changes, not just items present at initialization.
 	 *
 	 * @param toolbarModel the toolbar model containing the items
 	 * @param manager the toolbar manager
 	 */
 	private void setupVisibilityTracking(MToolBar toolbarModel, ToolBarManager manager) {
-		List<MToolBarElement> itemsToTrack = new ArrayList<>();
-		
-		// Find items that need visibility tracking
-		for (MToolBarElement item : toolbarModel.getChildren()) {
-			// Only track items that are NOT from contributions (contributions have their own tracking)
-			// and have a visibleWhen expression
-			ToolBarContributionRecord record = getContributionRecord(item);
-			if (record == null && requiresVisibilityCheck(item)) {
-				itemsToTrack.add(item);
-			}
-		}
-		
-		if (itemsToTrack.isEmpty()) {
-			return;
-		}
-		
-		// Collect expression info to determine which variables to track
-		ExpressionInfo info = new ExpressionInfo();
-		for (MToolBarElement item : itemsToTrack) {
-			ContributionsAnalyzer.collectInfo(info, item.getVisibleWhen());
-		}
-		updateVariables.addAll(Arrays.asList(info.getAccessedVariableNames()));
-		
 		final IEclipseContext parentContext = getContext(toolbarModel);
 		if (parentContext == null) {
 			// Cannot set up tracking without a context
@@ -1019,25 +999,38 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 					return false;
 				}
 				
-				ExpressionContext exprContext = new ExpressionContext(parentContext.getActiveLeaf());
-				boolean changed = false;
+				// Collect expression info from current toolbar items to determine which variables to track
+				// This is done dynamically each time to handle items added/removed after initialization
+				ExpressionInfo info = new ExpressionInfo();
+				List<MToolBarElement> itemsToCheck = new ArrayList<>();
 				
-				for (MToolBarElement item : itemsToTrack) {
-					// Check if item still exists in the toolbar
-					if (!toolbarModel.getChildren().contains(item)) {
-						continue;
+				for (MToolBarElement item : toolbarModel.getChildren()) {
+					// Only track items that are NOT from contributions (contributions have their own tracking)
+					// and have a visibleWhen expression
+					ToolBarContributionRecord record = getContributionRecord(item);
+					if (record == null && requiresVisibilityCheck(item)) {
+						itemsToCheck.add(item);
+						ContributionsAnalyzer.collectInfo(info, item.getVisibleWhen());
 					}
-					
+				}
+				
+				// Update the set of variables to track
+				updateVariables.addAll(Arrays.asList(info.getAccessedVariableNames()));
+				
+				ExpressionContext exprContext = new ExpressionContext(parentContext.getActiveLeaf());
+				boolean visibilityChanged = false;
+				
+				for (MToolBarElement item : itemsToCheck) {
 					boolean currentVisibility = item.isVisible();
 					boolean newVisibility = computeItemVisibility(item, exprContext);
 					
 					if (currentVisibility != newVisibility) {
 						item.setVisible(newVisibility);
-						changed = true;
+						visibilityChanged = true;
 					}
 				}
 				
-				if (changed) {
+				if (visibilityChanged) {
 					runExternalCode(() -> {
 						manager.update(false);
 						getUpdater().updateContributionItems(e -> {
