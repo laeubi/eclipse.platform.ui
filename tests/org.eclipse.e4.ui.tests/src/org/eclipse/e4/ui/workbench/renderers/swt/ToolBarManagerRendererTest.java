@@ -489,6 +489,7 @@ public class ToolBarManagerRendererTest {
 
 	@Test
 	public void testVisibilityOfToolBarItemChangesBasedOnImperativeExpression() {
+		contextRule.createAndRunWorkbench(window);
 		// Create a direct tool item with imperative expression
 		MDirectToolItem toolItem = ems.createModelElement(MDirectToolItem.class);
 		toolItem.setElementId("testToolItem");
@@ -503,7 +504,6 @@ public class ToolBarManagerRendererTest {
 
 		toolBar.getChildren().add(toolItem);
 
-		contextRule.createAndRunWorkbench(window);
 		ToolBarManager tbm = getToolBarManager();
 
 		assertEquals(1, tbm.getSize());
