@@ -142,7 +142,8 @@ public final class ContributionsAnalyzer {
 	 * <li>Are marked as "to be rendered"</li>
 	 * </ul>
 	 * <p>
-	 * Note: This method is prefixed with "XXX" indicating it may be deprecated or under review.
+	 * Note: This is a legacy method prefixed with "XXX". It does not evaluate visibility expressions.
+	 * It is kept for backward compatibility with existing code.
 	 *
 	 * @param toolbarContributionList the list of all available toolbar contributions to search through
 	 * @param id the ID of the toolbar to gather contributions for
@@ -181,7 +182,9 @@ public final class ContributionsAnalyzer {
 	 * <li>Filtering based on MC_MENU and MC_POPUP tags to prevent cross-contamination</li>
 	 * </ul>
 	 * <p>
-	 * Note: This method is prefixed with "XXX" indicating it may be deprecated or under review.
+	 * Note: This is a legacy method prefixed with "XXX". It does not evaluate visibility expressions.
+	 * Consider using {@link #gatherMenuContributions(MMenu, List, String, ArrayList, ExpressionContext, boolean)}
+	 * for visibility-aware contribution gathering.
 	 *
 	 * @param menuModel the menu model to gather contributions for
 	 * @param menuContributionList the list of all available menu contributions
