@@ -21,14 +21,17 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.eclipse.core.runtime.ILogListener;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.e4.core.di.annotations.Evaluate;
+import org.eclipse.e4.core.di.annotations.Optional;
 import org.eclipse.e4.core.services.events.IEventBroker;
 import org.eclipse.e4.ui.model.application.MApplication;
+import org.eclipse.e4.ui.model.application.ui.MImperativeExpression;
 import org.eclipse.e4.ui.model.application.ui.basic.MTrimBar;
 import org.eclipse.e4.ui.model.application.ui.basic.MTrimmedWindow;
 import org.eclipse.e4.ui.model.application.ui.menu.MDirectToolItem;
@@ -521,8 +524,7 @@ public class ToolBarManagerRendererTest {
 		toolItem1.setElementId("Item1");
 		
 		// Create an imperative expression that checks for a context variable
-		org.eclipse.e4.ui.model.application.ui.MImperativeExpression exp1 = 
-			ems.createModelElement(org.eclipse.e4.ui.model.application.ui.MImperativeExpression.class);
+		MImperativeExpression exp1 = ems.createModelElement(MImperativeExpression.class);
 		exp1.setTracking(true);
 		exp1.setContributionURI("bundleclass://org.eclipse.e4.ui.tests/org.eclipse.e4.ui.workbench.renderers.swt.ToolBarManagerRendererTest$TestVisibilityExpression");
 		toolItem1.setVisibleWhen(exp1);
@@ -564,7 +566,7 @@ public class ToolBarManagerRendererTest {
 	 */
 	public static class TestVisibilityExpression {
 		@Evaluate
-		public boolean evaluate(@org.eclipse.e4.core.di.annotations.Optional @jakarta.inject.Named("showItem1") Boolean showItem1) {
+		public boolean evaluate(@Optional @Named("showItem1") Boolean showItem1) {
 			return showItem1 != null && showItem1.booleanValue();
 		}
 	}
