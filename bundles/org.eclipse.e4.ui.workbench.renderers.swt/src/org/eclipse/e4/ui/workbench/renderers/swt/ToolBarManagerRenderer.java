@@ -516,17 +516,7 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 					}
 
 					record.updateVisibility(parentContext.getActiveLeaf());
-					runExternalCode(() -> {
-						manager.update(false);
-						getUpdater().updateContributionItems(e -> {
-							if (e instanceof MToolBarElement) {
-								if (((MUIElement) ((MToolBarElement) e).getParent()) == toolbarModel) {
-									return true;
-								}
-							}
-							return false;
-						});
-					});
+					refreshToolBar(manager, toolbarModel);
 					return true;
 				}
 			});
@@ -658,8 +648,9 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		ExpressionInfo info = new ExpressionInfo();
 		for (MToolBarElement element : itemsWithVisibility) {
 			ContributionsAnalyzer.collectInfo(info, element.getVisibleWhen());
-			if (element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER) != null) {
-				info.addVariableNameAccess(element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER));
+			String visibilityId = element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER);
+			if (visibilityId != null) {
+				info.addVariableNameAccess(visibilityId);
 			}
 		}
 		updateVariables.addAll(Arrays.asList(info.getAccessedVariableNames()));
@@ -689,17 +680,7 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 				}
 
 				if (visibilityChanged) {
-					runExternalCode(() -> {
-						manager.update(false);
-						getUpdater().updateContributionItems(e -> {
-							if (e instanceof MToolBarElement) {
-								if (((MUIElement) ((MToolBarElement) e).getParent()) == toolbarModel) {
-									return true;
-								}
-							}
-							return false;
-						});
-					});
+					refreshToolBar(manager, toolbarModel);
 				}
 				return true;
 			}
@@ -735,6 +716,23 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		}
 
 		return visible;
+	}
+
+	/**
+	 * Refresh the toolbar manager and update contribution items for the specified toolbar
+	 */
+	private void refreshToolBar(final ToolBarManager manager, final MToolBar toolbarModel) {
+		runExternalCode(() -> {
+			manager.update(false);
+			getUpdater().updateContributionItems(e -> {
+				if (e instanceof MToolBarElement) {
+					if (((MUIElement) ((MToolBarElement) e).getParent()) == toolbarModel) {
+						return true;
+					}
+				}
+				return false;
+			});
+		});
 	}
 
 	private void updateWidget(ToolBarManager manager) {
