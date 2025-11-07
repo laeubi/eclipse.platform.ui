@@ -702,8 +702,8 @@ public class ToolBarManagerRenderer extends SWTPartRenderer {
 		boolean visible = true;
 
 		// Check persisted state visibility identifier
-		if (element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER) != null) {
-			String identifier = element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER);
+		String identifier = element.getPersistedState().get(MenuManagerRenderer.VISIBILITY_IDENTIFIER);
+		if (identifier != null) {
 			Object rc = exprContext.eclipseContext.get(identifier);
 			if (rc instanceof Boolean) {
 				visible = ((Boolean) rc).booleanValue();

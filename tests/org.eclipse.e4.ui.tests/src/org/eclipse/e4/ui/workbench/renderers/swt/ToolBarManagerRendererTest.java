@@ -567,7 +567,7 @@ public class ToolBarManagerRendererTest {
 	public static class TestVisibilityExpression {
 		@Evaluate
 		public boolean evaluate(@Optional @Named("showItem1") Boolean showItem1) {
-			return showItem1 != null && showItem1.booleanValue();
+			return Boolean.TRUE.equals(showItem1);
 		}
 	}
 
