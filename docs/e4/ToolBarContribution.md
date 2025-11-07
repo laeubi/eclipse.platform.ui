@@ -121,7 +121,7 @@ Here's what a ToolBarContribution looks like in the fragment.e4xmi XML:
           label="Custom Action"
           tooltip="Performs a custom action"
           iconURI="platform:/plugin/com.example.myapp/icons/custom.png"
-          command="_custom_command"/>
+          command="_imported_command"/>
       
       <children xsi:type="menu:ToolBarSeparator" 
           xmi:id="_separator"
@@ -130,7 +130,7 @@ Here's what a ToolBarContribution looks like in the fragment.e4xmi XML:
     </elements>
   </fragments>
   
-  <!-- Import the command if defined elsewhere -->
+  <!-- Import the command defined elsewhere -->
   <imports xsi:type="commands:Command" 
       xmi:id="_imported_command"
       elementId="com.example.myapp.commands.custom"/>
@@ -243,7 +243,6 @@ Create the handler class referenced in the contribution:
 package com.example.extension.handlers;
 
 import org.eclipse.e4.core.di.annotations.Execute;
-import jakarta.inject.Named;
 
 public class RefreshHandler {
     
