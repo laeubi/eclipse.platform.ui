@@ -1399,7 +1399,7 @@ public class PartServiceImpl implements EPartService {
 				MUIElement candidate = partActivationHistory.getSiblingSelectionCandidate(part);
 				candidate = candidate == null ? null
 						: candidate.getCurSharedRef() == null ? candidate : candidate.getCurSharedRef();
-				if (candidate != null && children.contains(candidate)) {
+				if (candidate != null && children.contains(candidate) && candidate.isToBeRendered()) {
 					parent.setSelectedElement(candidate);
 				} else {
 					for (MUIElement child : children) {

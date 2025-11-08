@@ -65,7 +65,10 @@ public class CommandLineOptionModelProcessor {
 
 		for (MPerspective persp : perspStack.getChildren()) {
 			if (persp.getElementId().equals(forcedPerspectiveId)) {
-				perspStack.setSelectedElement(persp);
+				// Only set as selected if it's to be rendered
+				if (persp.isToBeRendered()) {
+					perspStack.setSelectedElement(persp);
+				}
 				return;
 			}
 		}

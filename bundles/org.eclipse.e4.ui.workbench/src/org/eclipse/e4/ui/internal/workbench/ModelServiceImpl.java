@@ -609,7 +609,10 @@ public class ModelServiceImpl implements EModelService {
 				element.setToBeRendered(true);
 			}
 
-			window.getParent().setSelectedElement(window);
+			// Only set the window as selected if it is still to be rendered (not being removed)
+			if (window.isToBeRendered()) {
+				window.getParent().setSelectedElement(window);
+			}
 		} else {
 			showElementInWindow(window, element);
 		}
@@ -647,7 +650,10 @@ public class ModelServiceImpl implements EModelService {
 
 			@SuppressWarnings("unchecked")
 			MElementContainer<MUIElement> container = (MElementContainer<MUIElement>) parent;
-			container.setSelectedElement(element);
+			// Only set as selected if the element is still to be rendered
+			if (element.isToBeRendered()) {
+				container.setSelectedElement(element);
+			}
 			if (window != parent) {
 				showElementInWindow(window, parent);
 			}
