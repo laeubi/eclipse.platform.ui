@@ -616,7 +616,10 @@ public class PartServiceImpl implements EPartService {
 		Assert.isNotNull(perspective);
 		MWindow window = getWindow();
 		if (window != null && isInContainer(window, perspective)) {
-			perspective.getParent().setSelectedElement(perspective);
+			// Only set the perspective as selected if it is still to be rendered
+			if (perspective.isToBeRendered()) {
+				perspective.getParent().setSelectedElement(perspective);
+			}
 			List<MPart> newPerspectiveParts = modelService.findElements(perspective, null,
 					MPart.class, null);
 			// if possible, keep the same active part across perspective switches
@@ -771,7 +774,10 @@ public class PartServiceImpl implements EPartService {
 			recordStackActivation(part);
 
 			delegateBringToTop(part);
-			window.getParent().setSelectedElement(window);
+			// Only set the window as selected if it is still to be rendered (not being removed)
+			if (window.isToBeRendered()) {
+				window.getParent().setSelectedElement(window);
+			}
 
 			partActivationHistory.activate(part, activateBranch);
 
@@ -1323,7 +1329,10 @@ public class PartServiceImpl implements EPartService {
 		parent = element.getParent();
 		if (parent != null && parent.getChildren().size() == 1) {
 			// if we're the only child, set ourselves as the selected element
-			parent.setSelectedElement(element);
+			// only if we're still to be rendered
+			if (element.isToBeRendered()) {
+				parent.setSelectedElement(element);
+			}
 		}
 	}
 
@@ -1390,7 +1399,7 @@ public class PartServiceImpl implements EPartService {
 				MUIElement candidate = partActivationHistory.getSiblingSelectionCandidate(part);
 				candidate = candidate == null ? null
 						: candidate.getCurSharedRef() == null ? candidate : candidate.getCurSharedRef();
-				if (candidate != null && children.contains(candidate)) {
+				if (candidate != null && children.contains(candidate) && candidate.isToBeRendered()) {
 					parent.setSelectedElement(candidate);
 				} else {
 					for (MUIElement child : children) {
