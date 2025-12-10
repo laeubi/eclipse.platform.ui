@@ -150,8 +150,9 @@ public class ModelAssembler {
 				if (oldMappings != null) {
 					removeFragmentElements(oldMappings);
 					
-					// Unload the old resource
-					unloadFragmentResource(bundle, fragmentHeader);
+					// Unload the old resources directly from the mappings
+					// This ensures we unload the correct resources even if the URI changed
+					unloadFragmentResourcesFromMappings(oldMappings);
 				}
 
 				// Then, add the new fragments
@@ -195,6 +196,26 @@ public class ModelAssembler {
 		}
 
 		/**
+		 * Unloads fragment resources directly from the mappings.
+		 * This ensures the correct resources are unloaded even if the bundle's
+		 * Model-Fragment header URI has changed.
+		 * 
+		 * @param mappings the mappings containing the fragment wrappers
+		 */
+		private void unloadFragmentResourcesFromMappings(List<FragmentWrapperElementMapping> mappings) {
+			for (FragmentWrapperElementMapping mapping : mappings) {
+				try {
+					Resource resource = ((EObject) mapping.wrapper().getFragmentContainer()).eResource();
+					if (resource != null) {
+						resource.unload();
+					}
+				} catch (RuntimeException e) {
+					warn("Unable to unload fragment resource: {}", e.getMessage(), e); //$NON-NLS-1$
+				}
+			}
+		}
+
+		/**
 		 * Unloads the fragment resource for the given bundle.
 		 * 
 		 * @param bundle the bundle containing the fragment
@@ -211,7 +232,7 @@ public class ModelAssembler {
 				String attrURI = fr[0].trim();
 				E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
 				ResourceSet resourceSet = applicationResource.getResourceSet();
-				if (attrURI == null || attrURI.isEmpty()) {
+				if (attrURI.isEmpty()) {
 					warn("Unable to find location for the model extension {}", bundleName); //$NON-NLS-1$
 					return;
 				}
