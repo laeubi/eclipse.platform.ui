@@ -228,7 +228,7 @@ public class ModelAssembler {
 
 			String bundleName = bundle.getSymbolicName();
 			String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
-			if (fr.length > 0) {
+			if (fr.length > 0 && fr[0] != null) {
 				String attrURI = fr[0].trim();
 				E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
 				ResourceSet resourceSet = applicationResource.getResourceSet();
@@ -252,12 +252,12 @@ public class ModelAssembler {
 				}
 
 				try {
-					Resource resource = resourceSet.getResource(uri, false);
-					if (resource != null) {
-						resource.unload();
-					}
+					// Use true to ensure the resource is loaded before unloading
+					// This matches the original behavior in removedBundle
+					Resource resource = resourceSet.getResource(uri, true);
+					resource.unload();
 				} catch (RuntimeException e) {
-					warn("Unable to unload model extension from {} of {}", uri, bundleName, e); //$NON-NLS-1$
+					warn("Unable to read model extension from {} of {}", uri, bundleName); //$NON-NLS-1$
 				}
 			}
 		}
