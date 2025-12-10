@@ -130,8 +130,70 @@ public class ModelAssembler {
 		}
 
 		@Override
-		public void modifiedBundle(Bundle bundle, BundleEvent event, List<FragmentWrapperElementMapping> mapping) {
-			// do nothing
+		public void modifiedBundle(Bundle bundle, BundleEvent event, List<FragmentWrapperElementMapping> oldMappings) {
+			// When a bundle is modified (updated), we need to:
+			// 1. Remove the old fragment contributions
+			// 2. Add the new fragment contributions
+			// This ensures that updates to model fragments are properly reflected in the application model
+
+			// Only process if the bundle still has a Model-Fragment header
+			if (bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER) == null) {
+				// If the header was removed, treat it as a removal
+				removedBundle(bundle, event, oldMappings);
+				return;
+			}
+
+			uiSync.asyncExec(() -> {
+				// First, remove the old fragments
+				if (oldMappings != null) {
+					oldMappings.stream().flatMap(m -> m.elements.stream()).forEach(appElement -> {
+						// TODO implement removal of contributions, e.g. MenuContributions
+
+						if (appElement instanceof MUIElement element) {
+							element.setToBeRendered(false);
+							if (element.getParent() != null) {
+								element.getParent().getChildren().remove(element);
+							}
+						}
+					});
+
+					// Unload the old resource
+					String bundleName = bundle.getSymbolicName();
+					String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
+					String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
+					if (fr.length > 0) {
+						String attrURI = fr[0];
+						E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
+						ResourceSet resourceSet = applicationResource.getResourceSet();
+						if (attrURI != null) {
+							URI uri;
+							try {
+								// check if the attrURI is already a platform URI
+								if (URIHelper.isPlatformURI(attrURI)) {
+									uri = URI.createURI(attrURI);
+								} else {
+									String path = bundleName + '/' + attrURI;
+									uri = URI.createPlatformPluginURI(path, false);
+								}
+
+								Resource resource = resourceSet.getResource(uri, false);
+								if (resource != null) {
+									resource.unload();
+								}
+							} catch (RuntimeException e) {
+								warn("Unable to unload model extension from {} of {}", attrURI, bundleName, e); //$NON-NLS-1$
+							}
+						}
+					}
+				}
+
+				// Then, add the new fragments
+				// Note: we use 'false' for initial since bundle updates happen after initial startup
+				List<ModelFragmentWrapper> newWrappers = getModelFragmentWrapperFromBundle(bundle, false);
+				if (!newWrappers.isEmpty()) {
+					processFragmentWrappers(newWrappers);
+				}
+			});
 		}
 
 		@Override
@@ -374,8 +436,20 @@ public class ModelAssembler {
 		String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
 		String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
 		if (fr.length > 0) {
-			String uri = fr[0];
-			String apply = fr.length > 1 ? fr[1].split("=")[1] : "always"; //$NON-NLS-1$ //$NON-NLS-2$
+			String uri = fr[0].trim();
+			String apply = ALWAYS;
+
+			// Parse the apply attribute from the header
+			// Expected format: "fragment.e4xmi;apply=initial" or "fragment.e4xmi;apply=always"
+			if (fr.length > 1) {
+				String applyParam = fr[1].trim();
+				String[] parts = applyParam.split("="); //$NON-NLS-1$
+				if (parts.length == 2 && "apply".equals(parts[0].trim())) { //$NON-NLS-1$
+					apply = parts[1].trim();
+				} else {
+					warn("Model-Fragment header has invalid apply parameter format: {}, falling back to always", applyParam); //$NON-NLS-1$
+				}
+			}
 
 			// check if the value for apply is valid
 			if (!ALWAYS.equals(apply) && !INITIAL.equals(apply) && !NOTEXISTS.equals(apply)) {
