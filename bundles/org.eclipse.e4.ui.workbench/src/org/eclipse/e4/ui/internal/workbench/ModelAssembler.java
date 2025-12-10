@@ -136,8 +136,10 @@ public class ModelAssembler {
 			// 2. Add the new fragment contributions
 			// This ensures that updates to model fragments are properly reflected in the application model
 
+			String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
+			
 			// Only process if the bundle still has a Model-Fragment header
-			if (bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER) == null) {
+			if (fragmentHeader == null) {
 				// If the header was removed, treat it as a removal
 				removedBundle(bundle, event, oldMappings);
 				return;
@@ -146,45 +148,10 @@ public class ModelAssembler {
 			uiSync.asyncExec(() -> {
 				// First, remove the old fragments
 				if (oldMappings != null) {
-					oldMappings.stream().flatMap(m -> m.elements.stream()).forEach(appElement -> {
-						// TODO implement removal of contributions, e.g. MenuContributions
-
-						if (appElement instanceof MUIElement element) {
-							element.setToBeRendered(false);
-							if (element.getParent() != null) {
-								element.getParent().getChildren().remove(element);
-							}
-						}
-					});
-
+					removeFragmentElements(oldMappings);
+					
 					// Unload the old resource
-					String bundleName = bundle.getSymbolicName();
-					String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
-					String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
-					if (fr.length > 0) {
-						String attrURI = fr[0];
-						E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
-						ResourceSet resourceSet = applicationResource.getResourceSet();
-						if (attrURI != null) {
-							URI uri;
-							try {
-								// check if the attrURI is already a platform URI
-								if (URIHelper.isPlatformURI(attrURI)) {
-									uri = URI.createURI(attrURI);
-								} else {
-									String path = bundleName + '/' + attrURI;
-									uri = URI.createPlatformPluginURI(path, false);
-								}
-
-								Resource resource = resourceSet.getResource(uri, false);
-								if (resource != null) {
-									resource.unload();
-								}
-							} catch (RuntimeException e) {
-								warn("Unable to unload model extension from {} of {}", attrURI, bundleName, e); //$NON-NLS-1$
-							}
-						}
-					}
+					unloadFragmentResource(bundle, fragmentHeader);
 				}
 
 				// Then, add the new fragments
@@ -201,54 +168,77 @@ public class ModelAssembler {
 			// remove fragment elements from application model
 			uiSync.asyncExec(() -> {
 				if (mappings != null) {
-					mappings.stream().flatMap(m -> m.elements.stream()).forEach(appElement -> {
-						// TODO implement removal of contributions, e.g. MenuContributions
-
-						if (appElement instanceof MUIElement element) {
-							element.setToBeRendered(false);
-							if (element.getParent() != null) {
-								element.getParent().getChildren().remove(element);
-							}
-						}
-					});
-
+					removeFragmentElements(mappings);
+					
 					// unload resource
-					String bundleName = bundle.getSymbolicName();
 					String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
-					String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
-					if (fr.length > 0) {
-						String attrURI = fr[0];
-						E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
-						ResourceSet resourceSet = applicationResource.getResourceSet();
-						if (attrURI == null) {
-							warn("Unable to find location for the model extension {}", bundleName); //$NON-NLS-1$
-							return;
-						}
-
-						URI uri;
-						try {
-							// check if the attrURI is already a platform URI
-							if (URIHelper.isPlatformURI(attrURI)) {
-								uri = URI.createURI(attrURI);
-							} else {
-								String path = bundleName + '/' + attrURI;
-								uri = URI.createPlatformPluginURI(path, false);
-							}
-						} catch (RuntimeException e) {
-							warn("Invalid location {} of model extension {}", attrURI, bundleName, e); //$NON-NLS-1$
-							return;
-						}
-
-						try {
-							Resource resource = resourceSet.getResource(uri, true);
-							resource.unload();
-						} catch (RuntimeException e) {
-							warn("Unable to read model extension from {} of {}", uri, bundleName); //$NON-NLS-1$
-						}
-					}
-
+					unloadFragmentResource(bundle, fragmentHeader);
 				}
 			});
+		}
+		/**
+		 * Removes fragment elements from the application model.
+		 * 
+		 * @param mappings the mappings containing elements to remove
+		 */
+		private void removeFragmentElements(List<FragmentWrapperElementMapping> mappings) {
+			mappings.stream().flatMap(m -> m.elements.stream()).forEach(appElement -> {
+				// TODO implement removal of contributions, e.g. MenuContributions
+
+				if (appElement instanceof MUIElement element) {
+					element.setToBeRendered(false);
+					if (element.getParent() != null) {
+						element.getParent().getChildren().remove(element);
+					}
+				}
+			});
+		}
+
+		/**
+		 * Unloads the fragment resource for the given bundle.
+		 * 
+		 * @param bundle the bundle containing the fragment
+		 * @param fragmentHeader the Model-Fragment header value
+		 */
+		private void unloadFragmentResource(Bundle bundle, String fragmentHeader) {
+			if (fragmentHeader == null) {
+				return;
+			}
+
+			String bundleName = bundle.getSymbolicName();
+			String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
+			if (fr.length > 0) {
+				String attrURI = fr[0].trim();
+				E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
+				ResourceSet resourceSet = applicationResource.getResourceSet();
+				if (attrURI == null || attrURI.isEmpty()) {
+					warn("Unable to find location for the model extension {}", bundleName); //$NON-NLS-1$
+					return;
+				}
+
+				URI uri;
+				try {
+					// check if the attrURI is already a platform URI
+					if (URIHelper.isPlatformURI(attrURI)) {
+						uri = URI.createURI(attrURI);
+					} else {
+						String path = bundleName + '/' + attrURI;
+						uri = URI.createPlatformPluginURI(path, false);
+					}
+				} catch (RuntimeException e) {
+					warn("Invalid location {} of model extension {}", attrURI, bundleName, e); //$NON-NLS-1$
+					return;
+				}
+
+				try {
+					Resource resource = resourceSet.getResource(uri, false);
+					if (resource != null) {
+						resource.unload();
+					}
+				} catch (RuntimeException e) {
+					warn("Unable to unload model extension from {} of {}", uri, bundleName, e); //$NON-NLS-1$
+				}
+			}
 		}
 	}
 
