@@ -130,8 +130,38 @@ public class ModelAssembler {
 		}
 
 		@Override
-		public void modifiedBundle(Bundle bundle, BundleEvent event, List<FragmentWrapperElementMapping> mapping) {
-			// do nothing
+		public void modifiedBundle(Bundle bundle, BundleEvent event, List<FragmentWrapperElementMapping> oldMappings) {
+			// When a bundle is modified (updated), we need to:
+			// 1. Remove the old fragment contributions
+			// 2. Add the new fragment contributions
+			// This ensures that updates to model fragments are properly reflected in the application model
+
+			String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
+			
+			// Only process if the bundle still has a Model-Fragment header
+			if (fragmentHeader == null) {
+				// If the header was removed, treat it as a removal
+				removedBundle(bundle, event, oldMappings);
+				return;
+			}
+
+			uiSync.asyncExec(() -> {
+				// First, remove the old fragments
+				if (oldMappings != null) {
+					removeFragmentElements(oldMappings);
+					
+					// Unload the old resources directly from the mappings
+					// This ensures we unload the correct resources even if the URI changed
+					unloadFragmentResourcesFromMappings(oldMappings);
+				}
+
+				// Then, add the new fragments
+				// Note: we use 'false' for initial since bundle updates happen after initial startup
+				List<ModelFragmentWrapper> newWrappers = getModelFragmentWrapperFromBundle(bundle, false);
+				if (!newWrappers.isEmpty()) {
+					processFragmentWrappers(newWrappers);
+				}
+			});
 		}
 
 		@Override
@@ -139,54 +169,97 @@ public class ModelAssembler {
 			// remove fragment elements from application model
 			uiSync.asyncExec(() -> {
 				if (mappings != null) {
-					mappings.stream().flatMap(m -> m.elements.stream()).forEach(appElement -> {
-						// TODO implement removal of contributions, e.g. MenuContributions
-
-						if (appElement instanceof MUIElement element) {
-							element.setToBeRendered(false);
-							if (element.getParent() != null) {
-								element.getParent().getChildren().remove(element);
-							}
-						}
-					});
-
+					removeFragmentElements(mappings);
+					
 					// unload resource
-					String bundleName = bundle.getSymbolicName();
 					String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
-					String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
-					if (fr.length > 0) {
-						String attrURI = fr[0];
-						E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
-						ResourceSet resourceSet = applicationResource.getResourceSet();
-						if (attrURI == null) {
-							warn("Unable to find location for the model extension {}", bundleName); //$NON-NLS-1$
-							return;
-						}
-
-						URI uri;
-						try {
-							// check if the attrURI is already a platform URI
-							if (URIHelper.isPlatformURI(attrURI)) {
-								uri = URI.createURI(attrURI);
-							} else {
-								String path = bundleName + '/' + attrURI;
-								uri = URI.createPlatformPluginURI(path, false);
-							}
-						} catch (RuntimeException e) {
-							warn("Invalid location {} of model extension {}", attrURI, bundleName, e); //$NON-NLS-1$
-							return;
-						}
-
-						try {
-							Resource resource = resourceSet.getResource(uri, true);
-							resource.unload();
-						} catch (RuntimeException e) {
-							warn("Unable to read model extension from {} of {}", uri, bundleName); //$NON-NLS-1$
-						}
-					}
-
+					unloadFragmentResource(bundle, fragmentHeader);
 				}
 			});
+		}
+		/**
+		 * Removes fragment elements from the application model.
+		 * 
+		 * @param mappings the mappings containing elements to remove
+		 */
+		private void removeFragmentElements(List<FragmentWrapperElementMapping> mappings) {
+			mappings.stream().flatMap(m -> m.elements.stream()).forEach(appElement -> {
+				// TODO implement removal of contributions, e.g. MenuContributions
+
+				if (appElement instanceof MUIElement element) {
+					element.setToBeRendered(false);
+					if (element.getParent() != null) {
+						element.getParent().getChildren().remove(element);
+					}
+				}
+			});
+		}
+
+		/**
+		 * Unloads fragment resources directly from the mappings.
+		 * This ensures the correct resources are unloaded even if the bundle's
+		 * Model-Fragment header URI has changed.
+		 * 
+		 * @param mappings the mappings containing the fragment wrappers
+		 */
+		private void unloadFragmentResourcesFromMappings(List<FragmentWrapperElementMapping> mappings) {
+			for (FragmentWrapperElementMapping mapping : mappings) {
+				try {
+					Resource resource = ((EObject) mapping.wrapper().getFragmentContainer()).eResource();
+					if (resource != null) {
+						resource.unload();
+					}
+				} catch (RuntimeException e) {
+					warn("Unable to unload fragment resource: {}", e.getMessage(), e); //$NON-NLS-1$
+				}
+			}
+		}
+
+		/**
+		 * Unloads the fragment resource for the given bundle.
+		 * 
+		 * @param bundle the bundle containing the fragment
+		 * @param fragmentHeader the Model-Fragment header value
+		 */
+		private void unloadFragmentResource(Bundle bundle, String fragmentHeader) {
+			if (fragmentHeader == null) {
+				return;
+			}
+
+			String bundleName = bundle.getSymbolicName();
+			String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
+			if (fr.length > 0 && fr[0] != null) {
+				String attrURI = fr[0].trim();
+				E4XMIResource applicationResource = (E4XMIResource) ((EObject) application).eResource();
+				ResourceSet resourceSet = applicationResource.getResourceSet();
+				if (attrURI.isEmpty()) {
+					warn("Unable to find location for the model extension {}", bundleName); //$NON-NLS-1$
+					return;
+				}
+
+				URI uri;
+				try {
+					// check if the attrURI is already a platform URI
+					if (URIHelper.isPlatformURI(attrURI)) {
+						uri = URI.createURI(attrURI);
+					} else {
+						String path = bundleName + '/' + attrURI;
+						uri = URI.createPlatformPluginURI(path, false);
+					}
+				} catch (RuntimeException e) {
+					warn("Invalid location {} of model extension {}", attrURI, bundleName, e); //$NON-NLS-1$
+					return;
+				}
+
+				try {
+					// Use true to ensure the resource is loaded before unloading
+					// This matches the original behavior in removedBundle
+					Resource resource = resourceSet.getResource(uri, true);
+					resource.unload();
+				} catch (RuntimeException e) {
+					warn("Unable to read model extension from {} of {}", uri, bundleName); //$NON-NLS-1$
+				}
+			}
 		}
 	}
 
@@ -374,8 +447,20 @@ public class ModelAssembler {
 		String fragmentHeader = bundle.getHeaders(Util.ZERO_LENGTH_STRING).get(MODEL_FRAGMENT_HEADER);
 		String[] fr = fragmentHeader.split(";"); //$NON-NLS-1$
 		if (fr.length > 0) {
-			String uri = fr[0];
-			String apply = fr.length > 1 ? fr[1].split("=")[1] : "always"; //$NON-NLS-1$ //$NON-NLS-2$
+			String uri = fr[0].trim();
+			String apply = ALWAYS;
+
+			// Parse the apply attribute from the header
+			// Expected format: "fragment.e4xmi;apply=initial" or "fragment.e4xmi;apply=always"
+			if (fr.length > 1) {
+				String applyParam = fr[1].trim();
+				String[] parts = applyParam.split("="); //$NON-NLS-1$
+				if (parts.length == 2 && "apply".equals(parts[0].trim())) { //$NON-NLS-1$
+					apply = parts[1].trim();
+				} else {
+					warn("Model-Fragment header has invalid apply parameter format: {}, falling back to always", applyParam); //$NON-NLS-1$
+				}
+			}
 
 			// check if the value for apply is valid
 			if (!ALWAYS.equals(apply) && !INITIAL.equals(apply) && !NOTEXISTS.equals(apply)) {
