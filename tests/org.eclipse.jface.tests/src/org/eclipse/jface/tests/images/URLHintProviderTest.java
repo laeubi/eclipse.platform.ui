@@ -16,7 +16,11 @@ package org.eclipse.jface.tests.images;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.graphics.ImageData;
@@ -197,6 +201,73 @@ public class URLHintProviderTest {
 		assertNotNull(imageData, "ImageData should not be null");
 		assertEquals(24, imageData.width, "Width should be 24 from query parameter");
 		assertEquals(24, imageData.height, "Height should be 24 from query parameter");
+	}
+
+	/**
+	 * Tests that file: URLs can have query parameters for size hints.
+	 * This is important because file URLs need special handling - the query
+	 * parameter should be used for size detection but stripped when accessing
+	 * the actual file.
+	 */
+	@Test
+	public void testFileURLWithQueryParameter() throws IOException {
+		// Copy test SVG to a temporary file
+		URL resourceUrl = URLHintProviderTest.class.getResource("/icons/imagetests/test-icon.svg");
+		assertNotNull(resourceUrl, "Test SVG not found");
+		
+		File tempSvg = File.createTempFile("test-icon", ".svg");
+		try {
+			Files.copy(resourceUrl.openStream(), tempSvg.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			
+			// Create file: URL with query parameter
+			URL fileUrl = tempSvg.toURI().toURL();
+			String fileUrlWithQuery = fileUrl.toExternalForm() + "?size=16x16";
+			URL fileUrlQuery = new URL(fileUrlWithQuery);
+			
+			// Verify URL has file protocol and query parameter
+			assertEquals("file", fileUrlQuery.getProtocol(), "Should be a file URL");
+			assertEquals("size=16x16", fileUrlQuery.getQuery(), "Query parameter should be preserved");
+			
+			// Test that ImageDescriptor can load the image with query parameter
+			ImageDescriptor descriptor = ImageDescriptor.createFromURL(fileUrlQuery);
+			ImageData imageData = descriptor.getImageData(100);
+			
+			assertNotNull(imageData, "ImageData should not be null for file URL with query parameter");
+			assertEquals(16, imageData.width, "Width should be 16 based on query parameter");
+			assertEquals(16, imageData.height, "Height should be 16 based on query parameter");
+		} finally {
+			tempSvg.delete();
+		}
+	}
+
+	/**
+	 * Tests that file: URLs with query parameters work at different zoom levels.
+	 */
+	@Test
+	public void testFileURLWithQueryParameterZoom() throws IOException {
+		// Copy test SVG to a temporary file
+		URL resourceUrl = URLHintProviderTest.class.getResource("/icons/imagetests/test-icon.svg");
+		assertNotNull(resourceUrl, "Test SVG not found");
+		
+		File tempSvg = File.createTempFile("test-icon", ".svg");
+		try {
+			Files.copy(resourceUrl.openStream(), tempSvg.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			
+			// Create file: URL with query parameter
+			URL fileUrl = tempSvg.toURI().toURL();
+			String fileUrlWithQuery = fileUrl.toExternalForm() + "?size=16x16";
+			URL fileUrlQuery = new URL(fileUrlWithQuery);
+			
+			// Test at 200% zoom
+			ImageDescriptor descriptor = ImageDescriptor.createFromURL(fileUrlQuery);
+			ImageData imageData = descriptor.getImageData(200);
+			
+			assertNotNull(imageData, "ImageData should not be null");
+			assertEquals(32, imageData.width, "Width should be 32 (16*2) at 200% zoom");
+			assertEquals(32, imageData.height, "Height should be 32 (16*2) at 200% zoom");
+		} finally {
+			tempSvg.delete();
+		}
 	}
 
 }
