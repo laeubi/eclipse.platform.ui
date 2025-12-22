@@ -177,6 +177,11 @@ class URLImageDescriptor extends ImageDescriptor implements IAdaptable {
 			if (InternalPolicy.OSGI_AVAILABLE) {
 				url = resolvePathVariables(url);
 			}
+			// For file: URLs, strip query parameters before opening the stream
+			// Query parameters are used for size hints but are not valid in file paths
+			if (FILE_PROTOCOL.equalsIgnoreCase(url.getProtocol()) && url.getQuery() != null) {
+				url = new URL(url.getProtocol(), url.getHost(), url.getPort(), url.getPath());
+			}
 			return url.openStream();
 		} catch (IOException e) {
 			e.printStackTrace();
