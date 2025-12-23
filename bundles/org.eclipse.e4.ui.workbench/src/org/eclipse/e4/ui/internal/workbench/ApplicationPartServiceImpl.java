@@ -131,7 +131,10 @@ public class ApplicationPartServiceImpl implements EPartService {
 	}
 
 	private void switchPerspectiveInternal(MPerspective perspective) {
-		perspective.getParent().setSelectedElement(perspective);
+		// Only set the perspective as selected if it is still to be rendered
+		if (perspective.isToBeRendered()) {
+			perspective.getParent().setSelectedElement(perspective);
+		}
 		UIEvents.publishEvent(UIEvents.UILifeCycle.PERSPECTIVE_SWITCHED, perspective);
 	}
 

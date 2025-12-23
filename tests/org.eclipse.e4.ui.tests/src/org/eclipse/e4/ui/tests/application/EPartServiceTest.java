@@ -10100,6 +10100,39 @@ public class EPartServiceTest extends UITest {
 
 	}
 
+	/**
+	 * Test for Bug 3509: IllegalArgumentException when exiting e4-RCP application.
+	 * This test verifies that activating a part when the window is being removed
+	 * (toBeRendered=false) doesn't throw an IllegalArgumentException.
+	 */
+	@Test
+	public void testActivatePartDuringWindowCleanup() {
+		createApplication("partId");
+
+		MWindow window = application.getChildren().get(0);
+		getEngine().createGui(window);
+
+		EPartService partService = window.getContext().get(EPartService.class);
+		MPart part = partService.findPart("partId");
+		assertNotNull(part);
+
+		// Activate the part first
+		partService.activate(part);
+		assertEquals(part, partService.getActivePart());
+
+		// Simulate window cleanup by setting toBeRendered to false
+		window.setToBeRendered(false);
+
+		// Now activate the part again - this should not throw an IllegalArgumentException
+		// even though the window is no longer toBeRendered
+		try {
+			partService.activate(part);
+			// If we reach here, the fix is working
+		} catch (IllegalArgumentException e) {
+			fail("Should not throw IllegalArgumentException when activating part during window cleanup: " + e.getMessage());
+		}
+	}
+
 	static class ExceptionListener implements IPartListener {
 
 		@Override
